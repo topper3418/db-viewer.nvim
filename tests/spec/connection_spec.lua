@@ -29,12 +29,30 @@ describe("db-viewer.connection", function()
     assert.equals("postgres", c.driver)
   end)
 
+  it("persists config_text when provided", function()
+    local config_text = table.concat({
+      'name = "dev"',
+      'driver = "sqlite"',
+      'path = "/tmp/dev.db"',
+    }, "\n")
+
+    connection.add({
+      name = "dev",
+      driver = "sqlite",
+      database = "/tmp/dev.db",
+      config_text = config_text,
+    })
+
+    local c = connection.get("dev")
+    assert.equals(config_text, c.config_text)
+  end)
+
   it("replaces an existing connection with the same name", function()
     connection.add({ name = "dev", driver = "postgres", database = "old" })
-    connection.add({ name = "dev", driver = "mysql",    database = "new" })
+    connection.add({ name = "dev", driver = "mysql", database = "new" })
     local c = connection.get("dev")
-    assert.equals("mysql",  c.driver)
-    assert.equals("new",    c.database)
+    assert.equals("mysql", c.driver)
+    assert.equals("new", c.database)
   end)
 
   it("removes a connection", function()
@@ -48,10 +66,10 @@ describe("db-viewer.connection", function()
   end)
 
   it("lists connections sorted by name", function()
-    connection.add({ name = "zebra", driver = "sqlite",   database = "z.db" })
+    connection.add({ name = "zebra", driver = "sqlite", database = "z.db" })
     connection.add({ name = "alpha", driver = "postgres", database = "a" })
     local list = connection.list()
-    assert.equals(2,       #list)
+    assert.equals(2, #list)
     assert.equals("alpha", list[1].name)
     assert.equals("zebra", list[2].name)
   end)

@@ -5,7 +5,8 @@ CONTENTS                                               *db-viewer-contents*
 
   1. Introduction .................. |db-viewer-intro|
   2. Setup ......................... |db-viewer-setup|
-  3. Configuration ................. |db-viewer-config|
+  3. Commands ...................... |db-viewer-commands|
+  4. Configuration ................. |db-viewer-config|
 
 ==============================================================================
 1. INTRODUCTION                                          *db-viewer-intro*
@@ -33,7 +34,25 @@ Pass your options to the setup function: >lua
 <
 
 ==============================================================================
-3. CONFIGURATION                                         *db-viewer-config*
+3. COMMANDS                                           *db-viewer-commands*
+
+`:DbViewerConnectionNew`
+  Opens a writable config-like buffer for creating a new connection.
+  Save the buffer (`:write`) to persist the connection.
+
+`:DbViewerConnectionEdit {name}`
+  Opens the same config-like buffer for an existing connection.
+  Save the buffer (`:write`) to update the stored connection.
+
+Current editor support is focused on SQLite configs with these keys:
+  - `name`
+  - `driver` (must be `sqlite`)
+  - `path` (path to the SQLite file)
+
+The raw config text you edit is persisted in the plugin's SQLite storage.
+
+==============================================================================
+4. CONFIGURATION                                         *db-viewer-config*
 
 `connections`                                   *db-viewer-config-connections*
   List of |DbViewerConnection| tables.  Default: `{}`
