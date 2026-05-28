@@ -1,0 +1,51 @@
+*db-viewer.txt*  Browse and query SQL databases from Neovim
+
+==============================================================================
+CONTENTS                                               *db-viewer-contents*
+
+  1. Introduction .................. |db-viewer-intro|
+  2. Setup ......................... |db-viewer-setup|
+  3. Configuration ................. |db-viewer-config|
+
+==============================================================================
+1. INTRODUCTION                                          *db-viewer-intro*
+
+db-viewer lets you connect to SQL databases (PostgreSQL, MySQL, SQLite),
+browse schemas, and run queries — all from inside Neovim.
+
+==============================================================================
+2. SETUP                                                 *db-viewer-setup*
+
+Pass your options to the setup function: >lua
+
+  require("db-viewer").setup({
+    connections = {
+      {
+        name     = "local",
+        driver   = "postgres",
+        host     = "localhost",
+        port     = 5432,
+        database = "mydb",
+        user     = "postgres",
+      },
+    },
+  })
+<
+
+==============================================================================
+3. CONFIGURATION                                         *db-viewer-config*
+
+`connections`                                   *db-viewer-config-connections*
+  List of |DbViewerConnection| tables.  Default: `{}`
+
+`float.width`                                      *db-viewer-config-width*
+  Fraction (0–1) or absolute column count.  Default: `0.8`
+
+`float.height`                                    *db-viewer-config-height*
+  Fraction (0–1) or absolute row count.    Default: `0.8`
+
+`float.border`                                    *db-viewer-config-border*
+  Border style passed to `nvim_open_win`.  Default: `"rounded"`
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
