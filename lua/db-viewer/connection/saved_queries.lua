@@ -5,6 +5,7 @@ local db = require("db-viewer.connection.db")
 
 local M = {}
 
+---Create the `saved_queries` table if it does not already exist.
 function M.ensure_table()
   db.exec([[ 
     CREATE TABLE IF NOT EXISTS saved_queries (
@@ -15,9 +16,20 @@ function M.ensure_table()
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
     );
+
+    -- Supports list_for_connection_id WHERE connection_id = ? ORDER BY id.
+    CREATE INDEX IF NOT EXISTS idx_saved_queries_connection_id_id
+      ON saved_queries(connection_id, id);
+
+    -- Useful for future "recent queries" views.
+    CREATE INDEX IF NOT EXISTS idx_saved_queries_created_at
+      ON saved_queries(created_at);
   ]])
 end
 
+---Decode stored JSON args text into a Lua list.
+---@param args_text string|nil
+---@return table
 local function decode_args(args_text)
   if args_text == nil or args_text == "" then
     return {}
@@ -29,47 +41,39 @@ local function decode_args(args_text)
   return decoded
 end
 
-local function get_connection_id_by_name(connection_name)
-  local rows = db.query(string.format(
-    "SELECT id FROM connections WHERE name = %s LIMIT 1;",
-    db.quote(connection_name)
-  ))
-  if #rows == 0 then
-    error(("unknown connection: %s"):format(connection_name))
-  end
-  return rows[1].id
-end
-
-function M.add(connection_name, query_text, args)
-  assert(type(connection_name) == "string" and connection_name ~= "", "connection name is required")
+---Insert a saved query row for an existing connection id.
+---@param connection_id integer
+---@param query_text string
+---@param args table|nil
+function M.add(connection_id, query_text, args)
+  assert(type(connection_id) == "number", "connection id is required")
   assert(type(query_text) == "string" and query_text ~= "", "query text is required")
 
   M.ensure_table()
-  local connection_id = get_connection_id_by_name(connection_name)
   local args_text = vim.json.encode(args or {})
 
-  db.exec(string.format(
-    "INSERT INTO saved_queries (connection_id, query_text, args_text) VALUES (%s, %s, %s);",
-    db.quote(connection_id),
-    db.quote(query_text),
-    db.quote(args_text)
-  ))
+  db.exec_prepared(
+    "INSERT INTO saved_queries (connection_id, query_text, args_text) VALUES (@p1, @p2, @p3);",
+    { connection_id, query_text, args_text }
+  )
 end
 
-function M.list_for_connection(connection_name)
-  assert(type(connection_name) == "string" and connection_name ~= "", "connection name is required")
+---List saved queries for a connection id.
+---@param connection_id integer
+---@return table[]
+function M.list_for_connection_id(connection_id)
+  assert(type(connection_id) == "number", "connection id is required")
 
   M.ensure_table()
-  local rows = db.query(string.format(
+  local rows = db.query_prepared(
     [[
       SELECT sq.id, sq.connection_id, sq.query_text, sq.args_text
       FROM saved_queries sq
-      JOIN connections c ON c.id = sq.connection_id
-      WHERE c.name = %s
+      WHERE sq.connection_id = @p1
       ORDER BY sq.id ASC;
     ]],
-    db.quote(connection_name)
-  ))
+    { connection_id }
+  )
 
   local results = {}
   for _, row in ipairs(rows) do
@@ -83,11 +87,14 @@ function M.list_for_connection(connection_name)
   return results
 end
 
+---Delete a saved query by its id.
+---@param id integer
 function M.delete(id)
   M.ensure_table()
-  db.exec(string.format("DELETE FROM saved_queries WHERE id = %s;", db.quote(id)))
+  db.exec_prepared("DELETE FROM saved_queries WHERE id = @p1;", { id })
 end
 
+---Delete all saved queries.
 function M.delete_all()
   M.ensure_table()
   db.exec("DELETE FROM saved_queries;")

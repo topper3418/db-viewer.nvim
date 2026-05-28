@@ -5,6 +5,7 @@ local db = require("db-viewer.connection.db")
 
 local M = {}
 
+---Create the `connections` table if it does not already exist.
 function M.ensure_table()
   db.exec([[ 
     CREATE TABLE IF NOT EXISTS connections (
@@ -21,20 +22,26 @@ function M.ensure_table()
   ]])
 end
 
+---Validate required user-facing fields for connection records.
+---@param conn DbViewerConnection
 local function validate(conn)
   assert(type(conn.name) == "string" and conn.name ~= "", "connection.name is required")
   assert(type(conn.driver) == "string" and conn.driver ~= "", "connection.driver is required")
   assert(type(conn.database) == "string" and conn.database ~= "", "connection.database is required")
 end
 
+---Insert or update a connection keyed by unique `name`.
+---When `name` already exists, values from the attempted insert (`excluded.*`)
+---replace the stored row.
+---@param conn DbViewerConnection
 function M.upsert(conn)
   validate(conn)
   M.ensure_table()
 
-  db.exec(string.format(
+  db.exec_prepared(
     [[
       INSERT INTO connections (name, driver, host, port, database_name, username, password)
-      VALUES (%s, %s, %s, %s, %s, %s, %s)
+      VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)
       ON CONFLICT(name) DO UPDATE SET
         driver=excluded.driver,
         host=excluded.host,
@@ -43,16 +50,13 @@ function M.upsert(conn)
         username=excluded.username,
         password=excluded.password;
     ]],
-    db.quote(conn.name),
-    db.quote(conn.driver),
-    db.quote(conn.host),
-    db.quote(conn.port),
-    db.quote(conn.database),
-    db.quote(conn.user),
-    db.quote(conn.password)
-  ))
+    { conn.name, conn.driver, conn.host, conn.port, conn.database, conn.user, conn.password }
+  )
 end
 
+---Map raw DB row column names to the plugin's connection shape.
+---@param row table|nil
+---@return DbViewerConnection|nil
 local function from_row(row)
   if not row then
     return nil
@@ -70,21 +74,26 @@ local function from_row(row)
   }
 end
 
+---Fetch one connection by its unique name.
+---@param name string
+---@return DbViewerConnection|nil
 function M.get_by_name(name)
   M.ensure_table()
-  local rows = db.query(string.format(
+  local rows = db.query_prepared(
     [[
       SELECT id, name, driver, host, port, database_name, username, password
       FROM connections
-      WHERE name = %s
+      WHERE name = @p1
       LIMIT 1;
     ]],
-    db.quote(name)
-  ))
+    { name }
+  )
 
   return from_row(rows[1])
 end
 
+---List all stored connections sorted by name.
+---@return DbViewerConnection[]
 function M.list_all()
   M.ensure_table()
   local rows = db.query([[ 
@@ -100,11 +109,14 @@ function M.list_all()
   return results
 end
 
+---Delete a connection by name.
+---@param name string
 function M.delete_by_name(name)
   M.ensure_table()
-  db.exec(string.format("DELETE FROM connections WHERE name = %s;", db.quote(name)))
+  db.exec_prepared("DELETE FROM connections WHERE name = @p1;", { name })
 end
 
+---Delete all connections.
 function M.delete_all()
   M.ensure_table()
   db.exec("DELETE FROM connections;")
