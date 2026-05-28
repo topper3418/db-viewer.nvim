@@ -13,6 +13,7 @@
 ---@field database string
 ---@field user?    string
 ---@field password? string  Stored in memory only; never written to disk
+---@field config_text? string  Raw editor text persisted for the connection
 
 ---@class DbViewerFloatConfig
 ---@field width      number  0–1 fraction of editor width, or absolute column count

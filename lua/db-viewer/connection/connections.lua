@@ -17,9 +17,23 @@ function M.ensure_table()
       database_name TEXT NOT NULL,
       username TEXT,
       password TEXT,
+      config_text TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   ]])
+
+  local columns = db.query("PRAGMA table_info(connections);")
+  local has_config_text = false
+  for _, column in ipairs(columns) do
+    if column.name == "config_text" then
+      has_config_text = true
+      break
+    end
+  end
+
+  if not has_config_text then
+    db.exec("ALTER TABLE connections ADD COLUMN config_text TEXT;")
+  end
 end
 
 ---Validate required user-facing fields for connection records.
@@ -40,17 +54,18 @@ function M.upsert(conn)
 
   db.exec_prepared(
     [[
-      INSERT INTO connections (name, driver, host, port, database_name, username, password)
-      VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)
+      INSERT INTO connections (name, driver, host, port, database_name, username, password, config_text)
+      VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8)
       ON CONFLICT(name) DO UPDATE SET
         driver=excluded.driver,
         host=excluded.host,
         port=excluded.port,
         database_name=excluded.database_name,
         username=excluded.username,
-        password=excluded.password;
+        password=excluded.password,
+        config_text=excluded.config_text;
     ]],
-    { conn.name, conn.driver, conn.host, conn.port, conn.database, conn.user, conn.password }
+    { conn.name, conn.driver, conn.host, conn.port, conn.database, conn.user, conn.password, conn.config_text }
   )
 end
 
@@ -71,6 +86,7 @@ local function from_row(row)
     database = row.database_name,
     user = row.username,
     password = row.password,
+    config_text = row.config_text,
   }
 end
 
@@ -81,7 +97,7 @@ function M.get_by_name(name)
   M.ensure_table()
   local rows = db.query_prepared(
     [[
-      SELECT id, name, driver, host, port, database_name, username, password
+      SELECT id, name, driver, host, port, database_name, username, password, config_text
       FROM connections
       WHERE name = @p1
       LIMIT 1;
@@ -97,7 +113,7 @@ end
 function M.list_all()
   M.ensure_table()
   local rows = db.query([[ 
-    SELECT id, name, driver, host, port, database_name, username, password
+    SELECT id, name, driver, host, port, database_name, username, password, config_text
     FROM connections
     ORDER BY name ASC;
   ]])
